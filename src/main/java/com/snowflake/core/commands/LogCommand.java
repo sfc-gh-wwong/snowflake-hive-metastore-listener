@@ -5,7 +5,6 @@ package com.snowflake.core.commands;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.snowflake.core.util.StringUtil.SensitiveString;
 
 import java.util.List;
 
@@ -40,12 +39,11 @@ public class LogCommand implements Command
    * SELECT NULL /* LOGS IN COMMENTS * /;
    * @return The Snowflake commands generated
    */
-  public List<SensitiveString> generateCommands()
+  public List<String> generateCommands()
   {
-    return ImmutableList.<SensitiveString>builder()
-        .add(new SensitiveString(
-            String.format("SELECT NULL /* %s */;",
-                          this.log.replace("*/", "* /"))))
+    return ImmutableList.<String>builder()
+        .add(String.format("SELECT NULL /* %s */;",
+                          this.log.replace("*/", "* /")))
         .build().asList();
   }
 

@@ -9,7 +9,6 @@ import com.snowflake.conf.SnowflakeConf.ConfVars;
 import com.snowflake.core.util.HiveToSnowflakeType;
 import com.snowflake.core.util.HiveToSnowflakeType.SnowflakeFileFormatTypes;
 import com.snowflake.core.util.StageCredentialUtil;
-import com.snowflake.core.util.StringUtil.SensitiveString;
 import com.snowflake.jdbc.client.SnowflakeClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -55,7 +54,7 @@ public class CreateExternalTable implements Command
    *         credentials=(AWS_KEY_ID='{accessKeyId}'
    *                      AWS_SECRET_KEY='{awsSecretKey}');
    */
-  private SensitiveString generateCreateStageCommand()
+  private String generateCreateStageCommand()
   {
     StringBuilder sb = new StringBuilder();
     String url = hiveTable.getSd().getLocation();
@@ -71,12 +70,12 @@ public class CreateExternalTable implements Command
     sb.append("url='");
     sb.append(HiveToSnowflakeType.toSnowflakeURL(url) + "'\n");
 
-    SensitiveString credentials = StageCredentialUtil
+    String credentials = StageCredentialUtil
         .generateCredentialsString(url, hiveConf);
     sb.append(credentials);
     sb.append(";");
 
-    return new SensitiveString(sb.toString(), credentials.getSecrets());
+    return sb.toString();
   }
 
   /**
@@ -271,10 +270,10 @@ public class CreateExternalTable implements Command
    * @return The Snowflake commands generated
    * @throws NotSupportedException Thrown when the input is invalid
    */
-  public List<SensitiveString> generateCommands()
+  public List<String> generateCommands()
       throws NotSupportedException, SQLException
   {
-    List<SensitiveString> queryList = new ArrayList<>();
+    List<String> queryList = new ArrayList<>();
 
     String stage = snowflakeConf.get(
         ConfVars.SNOWFLAKE_STAGE_FOR_HIVE_EXTERNAL_TABLES.getVarname(), null);
@@ -301,13 +300,13 @@ public class CreateExternalTable implements Command
     else
     {
       // No stage was specified, create one
-      SensitiveString createStageQuery = generateCreateStageCommand();
+      String createStageQuery = generateCreateStageCommand();
       queryList.add(createStageQuery);
       location = hiveTable.getTableName(); // Stage and table names are the same
     }
 
     Preconditions.checkNotNull(location);
-    queryList.add(new SensitiveString(generateCreateTableCommand(location)));
+    queryList.add(generateCreateTableCommand(location));
 
     return queryList;
   }

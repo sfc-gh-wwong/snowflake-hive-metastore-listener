@@ -4,7 +4,6 @@
 package com.snowflake.core.commands;
 
 import com.google.common.base.Preconditions;
-import com.snowflake.core.util.StringUtil.SensitiveString;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.events.DropPartitionEvent;
@@ -69,7 +68,7 @@ public class DropPartition implements Command
    * Generates the necessary commands on a Hive drop partition event
    * @return The Snowflake commands generated
    */
-  public List<SensitiveString> generateCommands()
+  public List<String> generateCommands()
   {
     List<String> queryList = new ArrayList<>();
 
@@ -80,8 +79,7 @@ public class DropPartition implements Command
       queryList.add(this.generateDropPartitionCommand(partition));
     }
 
-    return queryList
-        .stream().map(SensitiveString::new).collect(Collectors.toList());
+    return queryList;
   }
 
   private final Table hiveTable;
