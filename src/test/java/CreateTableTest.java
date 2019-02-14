@@ -460,7 +460,7 @@ public class CreateTableTest
     List<String> commands = createExternalTable.generateCommands();
     assertEquals("generated create stage command does not match " +
                      "expected create stage command",
-                 "CREATE OR REPLACE STAGE t1 " +
+                 "CREATE OR REPLACE STAGE someDB_t1 " +
                      "url='s3://bucketname/path/to/table'\n" +
                      "credentials=(AWS_KEY_ID='accessKeyId'\n" +
                      "AWS_SECRET_KEY='awsSecretKey');",
@@ -499,7 +499,7 @@ public class CreateTableTest
     List<String> commands = createExternalTable.generateCommands();
     assertEquals("generated create stage command does not match " +
                      "expected create stage command",
-                 "CREATE OR REPLACE STAGE t1 " +
+                 "CREATE OR REPLACE STAGE someDB_t1 " +
                      "url='INVALID PROTOCOL://bucketname/path/to/table'\n" +
                      "credentials=(/* Error generating credentials " +
                        "expression: The stage type does not exist or is " +
