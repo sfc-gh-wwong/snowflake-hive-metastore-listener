@@ -7,7 +7,10 @@ import com.snowflake.conf.SnowflakeConf;
 import com.snowflake.jdbc.client.SnowflakeClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.MetaStoreEventListener;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.events.AddPartitionEvent;
+import org.apache.hadoop.hive.metastore.events.AlterPartitionEvent;
+import org.apache.hadoop.hive.metastore.events.AlterTableEvent;
 import org.apache.hadoop.hive.metastore.events.CreateTableEvent;
 import org.apache.hadoop.hive.metastore.events.DropPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.DropTableEvent;
@@ -86,6 +89,28 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
   public void onDropPartition(DropPartitionEvent partitionEvent)
   {
     log.info("SnowflakeHiveListener: DropPartitionEvent received");
+    if (partitionEvent.getStatus())
+    {
+      SnowflakeClient.createAndExecuteEventForSnowflake(partitionEvent,
+                                                        snowflakeConf);
+    }
+  }
+
+  @Override
+  public void onAlterTable(AlterTableEvent tableEvent) throws MetaException
+  {
+    log.info("SnowflakeHiveListener: AlterTableEvent received");
+    if (tableEvent.getStatus())
+    {
+      SnowflakeClient.createAndExecuteEventForSnowflake(tableEvent,
+                                                        snowflakeConf);
+    }
+  }
+
+  @Override
+  public void onAlterPartition(AlterPartitionEvent partitionEvent) throws MetaException
+  {
+    log.info("SnowflakeHiveListener: AlterPartitionEvent received");
     if (partitionEvent.getStatus())
     {
       SnowflakeClient.createAndExecuteEventForSnowflake(partitionEvent,

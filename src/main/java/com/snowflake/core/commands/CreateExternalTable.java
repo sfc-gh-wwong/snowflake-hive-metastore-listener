@@ -45,6 +45,26 @@ public class CreateExternalTable implements Command
     this.hiveConf = Preconditions.checkNotNull(
         createTableEvent.getHandler().getConf());
     this.snowflakeConf = Preconditions.checkNotNull(snowflakeConf);
+    this.canReplace = true;
+  }
+
+  /**
+   * Creates a CreateExternalTable command, without an event
+   * @param hiveTable The Hive table to generate a command from
+   * @param snowflakeConf The configuration for Snowflake Hive metastore
+   *                      listener
+   * @param hiveTable The Hive configuration
+   * @param canReplace Whether to replace existing resources or not
+   */
+  protected CreateExternalTable(Table hiveTable,
+                                SnowflakeConf snowflakeConf,
+                                Configuration hiveConf,
+                                boolean canReplace)
+  {
+    this.hiveTable = Preconditions.checkNotNull(hiveTable);
+    this.snowflakeConf = Preconditions.checkNotNull(snowflakeConf);
+    this.hiveConf = Preconditions.checkNotNull(hiveConf);
+    this.canReplace = canReplace;
   }
 
   /**
@@ -60,7 +80,9 @@ public class CreateExternalTable implements Command
     String url = hiveTable.getSd().getLocation();
 
     // create stage command
-    sb.append("CREATE OR REPLACE STAGE ");
+    sb.append(String.format("CREATE %sSTAGE %s",
+                            (canReplace ? "OR REPLACE " : ""),
+                            (canReplace ? "" : "IF NOT EXISTS ")));
     // we use the table name as the stage name since every external table must
     // be linked to a stage and every table has a unique name
     sb.append(String.format("%s_%s ",
@@ -156,7 +178,9 @@ public class CreateExternalTable implements Command
     StringBuilder sb = new StringBuilder();
 
     // create table command
-    sb.append("CREATE OR REPLACE EXTERNAL TABLE ");
+    sb.append(String.format("CREATE %sEXTERNAL TABLE %s",
+                            (canReplace ? "OR REPLACE " : ""),
+                            (canReplace ? "" : "IF NOT EXISTS ")));
     sb.append(hiveTable.getTableName());
     sb.append("(");
 
@@ -316,4 +340,6 @@ public class CreateExternalTable implements Command
   private final Configuration hiveConf;
 
   private final SnowflakeConf snowflakeConf;
+
+  private boolean canReplace;
 }
