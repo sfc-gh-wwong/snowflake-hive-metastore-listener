@@ -231,14 +231,12 @@ public class AlterTableTest
 
     assertEquals("generated alter table command does not match " +
                      "expected alter table command",
-                 "ALTER TABLE t1 ADD " +
-                     "COLUMN new1 INT as (VALUE:c1::INT), " +
-                     "COLUMN new2 STRING as (VALUE:c2::STRING);",
+                 "ALTER TABLE t1 DROP COLUMN old1, old2;",
                  commands.get(2));
 
     assertEquals("generated alter table command does not match " +
                      "expected alter table command",
-                 "ALTER TABLE t1 DROP COLUMN old1, old2;",
+                 "ALTER TABLE t1 ADD COLUMN new1 INT as (VALUE:c1::INT), COLUMN new2 STRING as (VALUE:c2::STRING);",
                  commands.get(3));
   }
 }

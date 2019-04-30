@@ -49,6 +49,8 @@ public class AlterTable implements Command
    * Generates commands to add columns to a Snowflake table.
    * @param hiveTable The Hive table to generate a command from
    * @param columns The columns to be added
+   * @param startingPosition (CSV file formats only) number of columns to
+   *                         assume the table will have
    * @param snowflakeConf The configuration for Snowflake Hive metastore
    *                      listener
    * @return The commands generated, for example:
@@ -56,14 +58,12 @@ public class AlterTable implements Command
    */
   private static List<String> generateAddColumnsCommand(Table hiveTable,
                                                         List<FieldSchema> columns,
+                                                        int startingPosition,
                                                         SnowflakeConf snowflakeConf)
   {
     Preconditions.checkNotNull(hiveTable);
     Preconditions.checkNotNull(columns);
     Preconditions.checkArgument(!columns.isEmpty());
-
-    int startingPosition = hiveTable.getSd().getCols().size() - columns.size();
-    Preconditions.checkArgument(startingPosition >= 0);
 
     HiveToSnowflakeType.SnowflakeFileFormatType sfFileFmtType =
         HiveToSnowflakeType.toSnowflakeFileFormatType(
@@ -149,7 +149,7 @@ public class AlterTable implements Command
       return commands;
     }
 
-    // Try to preserve the order of the columns (even for drop) for determinism
+    // Set does not guarantee order. Preserve column order to be deterministic
     List<FieldSchema> addedColumns = newHiveTable.getSd().getCols().stream()
         .filter(col -> !columnNamesBefore.contains(col.getName()))
         .collect(Collectors.toList());
@@ -157,15 +157,27 @@ public class AlterTable implements Command
         .map(FieldSchema::getName)
         .filter(col -> !columnNamesAfter.contains(col))
         .collect(Collectors.toList());
-    if (!addedColumns.isEmpty())
+    if (droppedColumns.isEmpty())
     {
+      int startingPosition = oldHiveTable.getSd().getCols().size();
       commands.addAll(generateAddColumnsCommand(newHiveTable,
                                                 addedColumns,
+                                                startingPosition,
                                                 snowflakeConf));
     }
-    if (!droppedColumns.isEmpty())
+    else if (addedColumns.isEmpty())
     {
       commands.addAll(generateDropColumnsCommand(newHiveTable, droppedColumns));
+    }
+    else
+    {
+      // Rather than calculate which columns were dropped or added, just drop
+      // and add all columns
+      commands.addAll(generateDropColumnsCommand(newHiveTable, droppedColumns));
+      commands.addAll(generateAddColumnsCommand(newHiveTable,
+                                                addedColumns,
+                                                0,
+                                                snowflakeConf));
     }
 
     return commands;
