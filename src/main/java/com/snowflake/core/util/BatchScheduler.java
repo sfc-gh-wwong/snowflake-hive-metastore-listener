@@ -8,12 +8,13 @@ import com.snowflake.hive.listener.SnowflakeHiveListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -29,26 +30,11 @@ public class BatchScheduler<T>
   private static final Logger log =
       LoggerFactory.getLogger(SnowflakeHiveListener.class);
 
-  // Number of threads to use for the executor service of the scheduler
-  private int threadPoolCount;
-
-  // The amount of time between processing messages in the queue
-  private int batchingPeriodMs;
-
-  // Method that specifies what to do with the messages in the queue
-  private BiConsumer<Queue<T>, BatchScheduler<T>> processMessages;
-
   // The queue of messages yet to be processed
-  private ConcurrentLinkedQueue<T> messageQueue;
-
-  // Periodic executor service that delegates work to the worker pool
-  private ScheduledExecutorService scheduledExecutor = null;
-
-  // The future associated with the scheduled executor
-  private ScheduledFuture scheduledFuture = null;
+  private final BlockingQueue<T> messageQueue;
 
   // The worker pool
-  private ExecutorService threadPool = null;
+  private final ExecutorService threadPool;
 
   /**
    * Constructor for the scheduler
@@ -64,10 +50,31 @@ public class BatchScheduler<T>
     Preconditions.checkArgument(threadPoolCount > 0);
     Preconditions.checkArgument(batchingPeriodMs > 0);
     Preconditions.checkNotNull(processMessages);
-    this.messageQueue = new ConcurrentLinkedQueue<>();
-    this.threadPoolCount = threadPoolCount;
-    this.batchingPeriodMs = batchingPeriodMs;
-    this.processMessages = processMessages;
+    this.messageQueue = new LinkedBlockingQueue<>();
+
+    // Additional initialization
+    threadPool = Executors.newFixedThreadPool(threadPoolCount);
+
+    log.info(String.format("Starting schedule with a batching period of %s ms",
+                           batchingPeriodMs));
+    ScheduledExecutorService scheduledExecutor =
+        Executors.newSingleThreadScheduledExecutor();
+    // Notes:
+    //  - Executes a recurring action in a timely fashion (no drift)
+    //  - If an action takes longer than the period, all future actions are late
+    //  - If uncaught, an exception would stop future actions
+    scheduledExecutor.scheduleAtFixedRate(() ->
+    {
+      try
+      {
+        processMessages.accept(messageQueue, this);
+      }
+      catch (Throwable t)
+      {
+        log.warn("Hit exception running scheduled action: " + t);
+      }
+    }, 0, batchingPeriodMs, TimeUnit.MILLISECONDS);
+    log.info("Started scheduler");
   }
 
   /**
@@ -79,7 +86,6 @@ public class BatchScheduler<T>
     Preconditions.checkNotNull(message);
     log.info("Enqueueing message. Current count: " + messageQueue.size());
     messageQueue.add(message);
-    startIfNotStarted();
   }
 
   /**
@@ -91,62 +97,5 @@ public class BatchScheduler<T>
     Preconditions.checkNotNull(task);
     log.info("Task received");
     threadPool.submit(task);
-  }
-
-  /**
-   * Helper method that instantiates certain resources. Idempotent.
-   */
-  private void startIfNotStarted()
-  {
-    if (scheduledFuture != null && !scheduledFuture.isDone())
-    {
-      log.info("Scheduler already started");
-      return;
-    }
-
-    if (scheduledFuture != null && scheduledFuture.isDone())
-    {
-      try
-      {
-        scheduledFuture.get();
-      }
-      catch (Exception ex)
-      {
-        log.warn("Scheduler had stopped earlier due to exception: " + ex);
-      }
-    }
-
-    if (scheduledExecutor == null)
-    {
-      log.info("Starting schedule executor");
-      scheduledExecutor = Executors.newScheduledThreadPool(1);
-    }
-
-    if (threadPool == null)
-    {
-      log.info(String.format("Instantiating thread pool with %s threads",
-                             threadPoolCount));
-      threadPool = Executors.newFixedThreadPool(threadPoolCount);
-    }
-
-    log.info(String.format("Starting schedule with a batching period of %s ms",
-                           batchingPeriodMs));
-
-    // Notes:
-    //  - Executes a recurring action in a timely fashion (no drift)
-    //  - If an action takes longer than the period, all future actions are late
-    //  - If uncaught, an exception would stop future actions
-    scheduledFuture = scheduledExecutor.scheduleAtFixedRate(() ->
-    {
-      try
-      {
-        processMessages.accept(messageQueue, this);
-      }
-      catch (Exception ex)
-      {
-        log.warn("Hit exception running scheduled action: " + ex);
-      }
-    }, 0, batchingPeriodMs, TimeUnit.MILLISECONDS);
-    log.info("Started scheduler");
   }
 }

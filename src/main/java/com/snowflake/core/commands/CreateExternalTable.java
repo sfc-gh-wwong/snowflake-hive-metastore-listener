@@ -11,7 +11,6 @@ import com.snowflake.core.util.HiveToSnowflakeType.SnowflakeFileFormatType;
 import com.snowflake.core.util.StageCredentialUtil;
 import com.snowflake.core.util.StringUtil;
 import com.snowflake.jdbc.client.SnowflakeClient;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -94,10 +93,10 @@ public class CreateExternalTable implements Command
    *         CREATE OR REPLACE STAGE s1 URL='s3://bucketname/path/to/table'
    *         STORAGE_INTEGRATION='storageIntegration';
    */
-  private static String generateCreateStageCommand(boolean canReplace,
-                                                   String stageName,
-                                                   String location,
-                                                   String extraArguments)
+  private static String generateLocation(boolean canReplace,
+                                         String stageName,
+                                         String location,
+                                         String extraArguments)
   {
     return String.format("CREATE %sSTAGE %s%s URL='%s'\n%s;",
                            (canReplace ? "OR REPLACE " : ""),
@@ -303,7 +302,7 @@ public class CreateExternalTable implements Command
    *           CREATE OR REPLACE STAGE s1 URL='s3://bucketname/path/to/table'
    *             STORAGE_INTEGRATION='storageIntegration';
    */
-  private Pair<String, Optional<String>> generateCreateStageCommand()
+  private LocationWithCreateStageCommand generateLocation()
       throws SQLException
   {
     String hiveTableLocation = hiveTable.getSd().getLocation();
@@ -318,7 +317,7 @@ public class CreateExternalTable implements Command
     {
       // An integration was provided. Use it to create a stage
       location = generateStageName(hiveTable, snowflakeConf);
-      command = generateCreateStageCommand(
+      command = generateLocation(
           this.canReplace,
           location,
           HiveToSnowflakeType.toSnowflakeURL(hiveTableLocation),
@@ -346,7 +345,7 @@ public class CreateExternalTable implements Command
     {
       // No stage was specified, create one
       location = generateStageName(hiveTable, snowflakeConf);
-      command = generateCreateStageCommand(
+      command = generateLocation(
           this.canReplace,
           location,
           HiveToSnowflakeType.toSnowflakeURL(hiveTableLocation),
@@ -362,7 +361,35 @@ public class CreateExternalTable implements Command
     }
 
     Preconditions.checkNotNull(location);
-    return Pair.of(location, Optional.ofNullable(command));
+    return new LocationWithCreateStageCommand(location, Optional.ofNullable(command));
+  }
+
+  /**
+   * Class that contains output from generateLocation.
+   * Contains a location suitable for creating a table with, as well as the
+   * command to its stage with, if a new stage should be used.
+   */
+  private class LocationWithCreateStageCommand
+  {
+    private String location;
+
+    private Optional<String> command;
+
+    LocationWithCreateStageCommand(String location, Optional<String> command)
+    {
+      this.location = location;
+      this.command = command;
+    }
+
+    String getLocation()
+    {
+      return location;
+    }
+
+    Optional<String> getCommand()
+    {
+      return command;
+    }
   }
 
   private String getStageLocationFromStageName(String stageName)
@@ -418,10 +445,10 @@ public class CreateExternalTable implements Command
   {
     List<String> queryList = new ArrayList<>();
 
-    Pair<String, Optional<String>> stageLocationAndCommand =
-        generateCreateStageCommand();
-    String location = stageLocationAndCommand.getKey();
-    stageLocationAndCommand.getValue().ifPresent(queryList::add);
+    LocationWithCreateStageCommand stageLocationAndCommand =
+        generateLocation();
+    String location = stageLocationAndCommand.getLocation();
+    stageLocationAndCommand.getCommand().ifPresent(queryList::add);
 
     Preconditions.checkNotNull(location);
     queryList.add(generateCreateTableCommand(location));
