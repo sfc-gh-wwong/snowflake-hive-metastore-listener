@@ -3,6 +3,7 @@
  */
 import com.snowflake.conf.SnowflakeConf;
 import com.snowflake.core.commands.CreateExternalTable;
+import com.snowflake.hive.listener.ListenerEventDetails;
 import com.snowflake.jdbc.client.SnowflakeClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.HiveMetaStore;
@@ -585,8 +586,11 @@ public class CreateTableTest
     SnowflakeConf mockConfig = TestUtil.initializeMockConfig();
 
     // Execute an event
-    SnowflakeClient.createAndExecuteEventForSnowflake(createTableEvent,
-                                                      mockConfig);
+    SnowflakeClient.createAndExecuteEventForSnowflake(
+        new ListenerEventDetails(createTableEvent.getTable().getDbName(),
+                                 createTableEvent.getTable().getTableName(),
+                                 createTableEvent),
+        mockConfig);
 
     // Count the number of times each query was executed. They should have
     // executed twice each.
@@ -779,8 +783,11 @@ public class CreateTableTest
     SnowflakeConf mockConfig = TestUtil.initializeMockConfig();
 
     // Execute an event
-    SnowflakeClient.createAndExecuteEventForSnowflake(createTableEvent,
-                                                      mockConfig);
+    SnowflakeClient.createAndExecuteEventForSnowflake(
+        new ListenerEventDetails(createTableEvent.getTable().getDbName(),
+                                 createTableEvent.getTable().getTableName(),
+                                 createTableEvent),
+        mockConfig);
 
     Mockito
         .verify(mockStatement, Mockito.times(1)); // No retries

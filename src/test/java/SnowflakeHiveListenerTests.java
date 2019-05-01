@@ -2,6 +2,7 @@
  * Copyright (c) 2018 Snowflake Computing Inc. All right reserved.
  */
 import com.snowflake.conf.SnowflakeConf;
+import com.snowflake.hive.listener.ListenerEventDetails;
 import com.snowflake.hive.listener.SnowflakeHiveListener;
 import com.snowflake.jdbc.client.SnowflakeClient;
 import org.apache.hadoop.conf.Configuration;
@@ -62,7 +63,11 @@ public class SnowflakeHiveListenerTests
     SnowflakeClient.createAndExecuteEventForSnowflake(any(), any());
 
     PowerMockito.verifyStatic(times(1));
-    SnowflakeClient.createAndExecuteEventForSnowflake(dropTableEvent, mockConfig);
+    SnowflakeClient.createAndExecuteEventForSnowflake(
+        new ListenerEventDetails(dropTableEvent.getTable().getDbName(),
+                                 dropTableEvent.getTable().getTableName(),
+                                 dropTableEvent),
+        mockConfig);
   }
 
   /**
@@ -139,7 +144,11 @@ public class SnowflakeHiveListenerTests
     SnowflakeClient.createAndExecuteEventForSnowflake(any(), any());
 
     PowerMockito.verifyStatic(times(1));
-    SnowflakeClient.createAndExecuteEventForSnowflake(dropTableEvent, mockConfig);
+    SnowflakeClient.createAndExecuteEventForSnowflake(
+        new ListenerEventDetails(dropTableEvent.getTable().getDbName(),
+                                 dropTableEvent.getTable().getTableName(),
+                                 dropTableEvent),
+        mockConfig);
   }
 
   /**
@@ -218,6 +227,10 @@ public class SnowflakeHiveListenerTests
     SnowflakeClient.createAndExecuteEventForSnowflake(any(), any());
 
     PowerMockito.verifyStatic(times(1));
-    SnowflakeClient.createAndExecuteEventForSnowflake(dropTableEvent, mockConfig);
+    SnowflakeClient.createAndExecuteEventForSnowflake(
+        new ListenerEventDetails(dropTableEvent.getTable().getDbName(),
+                                 dropTableEvent.getTable().getTableName(),
+                                 dropTableEvent),
+        mockConfig);
   }
 }

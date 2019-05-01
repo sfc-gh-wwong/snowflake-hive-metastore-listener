@@ -62,8 +62,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
     logTableEvent("Event received", tableEvent, tableEvent.getTable());
     if (shouldHandle(tableEvent, tableEvent.getTable()))
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(tableEvent,
-                                                        snowflakeConf);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(tableEvent.getTable().getTableName()),
+            Preconditions.checkNotNull(tableEvent.getTable().getDbName()),
+            tableEvent),
+          snowflakeConf);
     }
     else
     {
@@ -81,8 +85,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
     logTableEvent("Event received", tableEvent, tableEvent.getTable());
     if (shouldHandle(tableEvent, tableEvent.getTable()))
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(tableEvent,
-                                                        snowflakeConf);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(tableEvent.getTable().getTableName()),
+            Preconditions.checkNotNull(tableEvent.getTable().getDbName()),
+            tableEvent),
+          snowflakeConf);
     }
     else
     {
@@ -101,9 +109,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
                        partitionEvent.getTable(), partitionEvent.getPartitionIterator());
     if (partitionEvent.getStatus())
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(partitionEvent,
-                                                        snowflakeConf,
-                                                        false);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(partitionEvent.getTable().getTableName()),
+            Preconditions.checkNotNull(partitionEvent.getTable().getDbName()),
+            partitionEvent),
+          snowflakeConf);
     }
     else
     {
@@ -123,9 +134,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
                        partitionEvent.getTable(), partitionEvent.getPartitionIterator());
     if (shouldHandle(partitionEvent, partitionEvent.getTable()))
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(partitionEvent,
-                                                        snowflakeConf,
-                                                        false);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(partitionEvent.getTable().getTableName()),
+            Preconditions.checkNotNull(partitionEvent.getTable().getDbName()),
+            partitionEvent),
+          snowflakeConf);
     }
     else
     {
@@ -144,8 +158,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
     logTableEvent("Event received", tableEvent, tableEvent.getNewTable());
     if (shouldHandle(tableEvent, tableEvent.getNewTable()))
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(tableEvent,
-                                                        snowflakeConf);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(tableEvent.getOldTable().getTableName()),
+            Preconditions.checkNotNull(tableEvent.getOldTable().getDbName()),
+            tableEvent),
+          snowflakeConf);
     }
     else
     {
@@ -164,9 +182,12 @@ public class SnowflakeHiveListener extends MetaStoreEventListener
                       partitionEvent.getTable(), partitionEvent.getNewPartition());
     if (shouldHandle(partitionEvent, partitionEvent.getTable()))
     {
-      SnowflakeClient.createAndExecuteEventForSnowflake(partitionEvent,
-                                                        snowflakeConf,
-                                                        false);
+      SnowflakeClient.createAndExecuteEventForSnowflake(
+          new ListenerEventDetails(
+            Preconditions.checkNotNull(partitionEvent.getTable().getTableName()),
+            Preconditions.checkNotNull(partitionEvent.getTable().getDbName()),
+            partitionEvent),
+          snowflakeConf);
     }
     else
     {

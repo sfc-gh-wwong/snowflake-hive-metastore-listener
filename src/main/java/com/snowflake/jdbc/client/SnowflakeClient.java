@@ -3,13 +3,23 @@
  */
 package com.snowflake.jdbc.client;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.snowflake.conf.SnowflakeConf;
 import com.snowflake.core.commands.Command;
 import com.snowflake.core.commands.LogCommand;
-import com.snowflake.core.util.CommandBatchRewriter;
 import com.snowflake.core.util.CommandGenerator;
 import com.snowflake.core.util.BatchScheduler;
+import com.snowflake.hive.listener.ListenerEventDetails;
 import com.snowflake.hive.listener.SnowflakeHiveListener;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.events.AddPartitionEvent;
+import org.apache.hadoop.hive.metastore.events.AlterPartitionEvent;
+import org.apache.hadoop.hive.metastore.events.AlterTableEvent;
+import org.apache.hadoop.hive.metastore.events.CreateTableEvent;
+import org.apache.hadoop.hive.metastore.events.DropTableEvent;
 import org.apache.hadoop.hive.metastore.events.ListenerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,10 +29,11 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Class that uses the snowflake jdbc to connect to snowflake.
@@ -34,7 +45,7 @@ public class SnowflakeClient
   private static final Logger log =
       LoggerFactory.getLogger(SnowflakeHiveListener.class);
 
-  private static BatchScheduler<List<String>> scheduler;
+  private static BatchScheduler<TableKey, ListenerEventDetails> scheduler;
 
   /**
    * Creates and executes an event for snowflake. The steps are:
@@ -42,20 +53,39 @@ public class SnowflakeClient
    *    the Hive command
    * 2. Queue a query to Snowflake
    *
-   * At a predetermined interval, the queued queries will be executed.
+   * After a predetermined delay, the queued queries will be executed.
    * This includes:
    * 1. Batching similar queries
    * 2. Get the connection to a Snowflake account
    * 3. Run the queries on Snowflake
-   * @param event - the hive event
+   * @param eventDetails - the hive event details
    * @param snowflakeConf - the configuration for Snowflake Hive metastore
-   * @param forceSynchronous - whether to force the execution of statements
-   *                           to be synchronous
    */
   public static void createAndExecuteEventForSnowflake(
+      ListenerEventDetails eventDetails,
+      SnowflakeConf snowflakeConf)
+  {
+    boolean backgroundTaskEnabled = !snowflakeConf.getBoolean(
+        SnowflakeConf.ConfVars.SNOWFLAKE_CLIENT_FORCE_SYNCHRONOUS.getVarname(), false);
+    if (backgroundTaskEnabled)
+    {
+      initScheduler(snowflakeConf);
+      scheduler.enqueueMessage(eventDetails);
+    }
+    else
+    {
+      generateAndExecuteSnowflakeCommands(eventDetails.getEvent(), snowflakeConf);
+    }
+  }
+
+  /**
+   * Helper method. Generates commands for an event and executes those commands.
+   * @param event - the hive event
+   * @param snowflakeConf - the configuration for Snowflake Hive metastore
+   */
+  private static void generateAndExecuteSnowflakeCommands(
       ListenerEvent event,
-      SnowflakeConf snowflakeConf,
-      boolean forceSynchronous)
+      SnowflakeConf snowflakeConf)
   {
     // Obtains the proper command
     log.info("Creating the Snowflake command");
@@ -78,29 +108,7 @@ public class SnowflakeClient
       commandList = new LogCommand(e).generateCommands();
     }
 
-    boolean backgroundTaskEnabled = !(forceSynchronous || snowflakeConf.getBoolean(
-        SnowflakeConf.ConfVars.SNOWFLAKE_CLIENT_FORCE_SYNCHRONOUS.getVarname(), false));
-    if (backgroundTaskEnabled)
-    {
-      initScheduler(snowflakeConf);
-      scheduler.enqueueMessage(commandList);
-    }
-    else
-    {
-      executeStatements(commandList, snowflakeConf);
-    }
-  }
-
-  /**
-   * Overload. By default, forces execution of statements to be synchronous.
-   * @param event - the hive event
-   * @param snowflakeConf - the configuration for Snowflake Hive metastore
-   */
-  public static void createAndExecuteEventForSnowflake(
-      ListenerEvent event,
-      SnowflakeConf snowflakeConf)
-  {
-    createAndExecuteEventForSnowflake(event, snowflakeConf, true);
+    executeStatements(commandList, snowflakeConf);
   }
 
   /**
@@ -209,73 +217,94 @@ public class SnowflakeClient
     int numThreads = snowflakeConf.getInt(
         SnowflakeConf.ConfVars.SNOWFLAKE_CLIENT_THREAD_COUNT.getVarname(), 8);
 
-    int batchingPeriodMs = snowflakeConf.getInt(
-        SnowflakeConf.ConfVars.SNOWFLAKE_CLIENT_BATCHING_PERIOD.getVarname(), 1000);
-
-    scheduler = new BatchScheduler<>(numThreads, batchingPeriodMs,
-        (q, s) -> processMessages(q, s, snowflakeConf));
-  }
-
-  /**
-   * Method that is periodically invoked the by the batch scheduler
-   * @param commandQueue Queue containing messages
-   * @param scheduler An available thread pool to submit tasks to
-   * @param snowflakeConf The Snowflake configuration
-   */
-  private static void processMessages(Queue<List<String>> commandQueue,
-                                      BatchScheduler<List<String>> scheduler,
-                                      SnowflakeConf snowflakeConf)
-  {
-    if (commandQueue.isEmpty())
+    scheduler = new BatchScheduler<TableKey, ListenerEventDetails>(numThreads)
     {
-      // Exit early to avoid verbose periodic logging
-      return;
-    }
-
-    log.info("Processing messages in queue");
-
-    int batchRewriterSize = snowflakeConf.getInt(
-        SnowflakeConf.ConfVars.SNOWFLAKE_BATCH_REWRITER_SIZE.getVarname(),
-        500);
-    log.info("Number of queue messages to batch at once: " + batchRewriterSize);
-
-    while(!commandQueue.isEmpty())
-    {
-      List<List<String>> batches = new ArrayList<>();
-      while(!commandQueue.isEmpty() && batches.size() < batchRewriterSize)
+      @Override
+      public boolean processMessages(BlockingQueue<ListenerEventDetails> messages)
       {
-        batches.add(commandQueue.remove());
-      }
-      log.info("Dequeued batches: " + batches);
-
-      boolean batchRewriterEnabled = !snowflakeConf.getBoolean(
-          SnowflakeConf.ConfVars.SNOWFLAKE_CLIENT_FORCE_NO_BATCH_REWRITE.getVarname(),
-          false);
-      if (batchRewriterEnabled)
-      {
-        log.info("Rewriting batches...");
         try
         {
-          batches = CommandBatchRewriter.rewriteBatches(batches);
-          log.info("Rewritten batches: " + batches);
+          return SnowflakeClient.processMessages(messages, snowflakeConf);
         }
-        catch (Exception ex)
+        catch (InterruptedException e)
         {
-          log.warn("Could not rewrite batches. Error: " + ex);
+          log.warn("Thread interrupted: " + e);
+          Thread.currentThread().interrupt();
+          return false;
         }
-      }
-      else
-      {
-        log.info("Rewriting disabled. Continuing without the batch rewrite");
       }
 
-      batches.forEach(
-          batch -> scheduler.submitTask(() -> executeStatements(batch,
-                                                                snowflakeConf)));
-      log.info("Batches submitted.");
+      @Override
+      public TableKey getKeyFromMessage(ListenerEventDetails message)
+      {
+        return new TableKey(message.getDatabaseName(), message.getTableName());
+      }
+    };
+  }
+
+  private static boolean processMessages(BlockingQueue<ListenerEventDetails> messages,
+                                         SnowflakeConf snowflakeConf)
+      throws InterruptedException
+  {
+    if (messages.isEmpty())
+    {
+      return false;
+    }
+
+    ListenerEventDetails firstEvent = messages.peek();
+    log.info("Processing queue for %s.%s...",
+             firstEvent.getDatabaseName(),
+             firstEvent.getTableName());
+
+    List<Partition> partitionsAddedOrDropped = Lists.newArrayList();
+    int commandsExecuted = 0; // Execute N statements on a table at a time.
+    while(!messages.isEmpty())
+    {
+      ListenerEventDetails eventDetails = messages.poll(10, TimeUnit.SECONDS);
+      if (eventDetails == null)
+      {
+        return false;
+      }
+
+      ListenerEvent event = eventDetails.getEvent();
+      if (event instanceof AddPartitionEvent)
+      {
+        ((AddPartitionEvent)event).getPartitionIterator()
+            .forEachRemaining(partitionsAddedOrDropped::add);
+      }
+      if (event instanceof AlterPartitionEvent)
+      {
+        partitionsAddedOrDropped.add(((AlterPartitionEvent)event).getNewPartition());
+      }
+
+      if ((event instanceof AddPartitionEvent || event instanceof AlterPartitionEvent))
+      {
+        ListenerEventDetails nextEventDetails = messages.peek();
+        if (!messages.isEmpty()
+            && (nextEventDetails.getEvent() instanceof AddPartitionEvent || nextEventDetails.getEvent() instanceof AlterPartitionEvent))
+        {
+          continue;
+        }
+
+        Table table = event instanceof AddPartitionEvent
+            ? ((AddPartitionEvent) event).getTable()
+            : ((AlterPartitionEvent) event).getTable();
+        event = new AddPartitionEvent(table,
+                                      partitionsAddedOrDropped,
+                                      true,
+                                      event.getIHMSHandler());
+      }
+
+      generateAndExecuteSnowflakeCommands(event, snowflakeConf);
+      commandsExecuted++;
+      if (commandsExecuted > 10)
+      {
+        return true;
+      }
     }
 
     log.info("Queue processed.");
+    return false;
   }
 
   /**
@@ -396,5 +425,31 @@ public class SnowflakeClient
     int timeoutInMilliseconds = snowflakeConf.getInt(
         SnowflakeConf.ConfVars.SNOWFLAKE_HIVEMETASTORELISTENER_RETRY_TIMEOUT_MILLISECONDS.getVarname(), 1000);
     return retry(method, maxRetries, timeoutInMilliseconds);
+  }
+
+  private static class TableKey
+  {
+    private final String databaseName;
+
+    private final String tableName;
+
+    TableKey(String databaseName, String tableName)
+    {
+      Preconditions.checkNotNull(databaseName);
+      Preconditions.checkNotNull(tableName);
+      this.databaseName = databaseName;
+      this.tableName = tableName;
+    }
+
+    @Override
+    public int hashCode()
+    {
+      return new HashCodeBuilder().append(databaseName).append(tableName).build();
+    }
+
+    public String toString()
+    {
+      return String.format("%s.%s", databaseName, tableName);
+    }
   }
 }
