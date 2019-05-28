@@ -1,16 +1,16 @@
 /*
  * Copyright (c) 2012-2019 Snowflake Computing Inc. All right reserved.
  */
-package com.snowflake.core.util;
+package net.snowflake.HiveMetastoreConnector.core.util;
 
-import com.snowflake.conf.SnowflakeConf;
-import com.snowflake.core.commands.AddPartition;
-import com.snowflake.core.commands.AlterExternalTable;
-import com.snowflake.core.commands.Command;
-import com.snowflake.core.commands.CreateExternalTable;
-import com.snowflake.core.commands.DropExternalTable;
-import com.snowflake.core.commands.DropPartition;
-import com.snowflake.hive.listener.SnowflakeHiveListener;
+import net.snowflake.HiveMetastoreConnector.conf.SnowflakeConf;
+import net.snowflake.HiveMetastoreConnector.core.commands.AddPartition;
+import net.snowflake.HiveMetastoreConnector.core.commands.AlterExternalTable;
+import net.snowflake.HiveMetastoreConnector.core.commands.Command;
+import net.snowflake.HiveMetastoreConnector.core.commands.CreateExternalTable;
+import net.snowflake.HiveMetastoreConnector.core.commands.DropExternalTable;
+import net.snowflake.HiveMetastoreConnector.core.commands.DropPartition;
+import net.snowflake.HiveMetastoreConnector.hive.listener.SnowflakeHiveListener;
 import org.apache.hadoop.hive.metastore.events.AddPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.AlterTableEvent;

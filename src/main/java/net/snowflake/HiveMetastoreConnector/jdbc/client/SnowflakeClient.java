@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2012-2019 Snowflake Computing Inc. All right reserved.
  */
-package com.snowflake.jdbc.client;
+package net.snowflake.HiveMetastoreConnector.jdbc.client;
 
 import com.google.common.base.Preconditions;
-import com.snowflake.conf.SnowflakeConf;
-import com.snowflake.core.commands.Command;
-import com.snowflake.core.util.CommandGenerator;
-import com.snowflake.core.util.Scheduler;
-import com.snowflake.hive.listener.SnowflakeHiveListener;
+import net.snowflake.HiveMetastoreConnector.conf.SnowflakeConf;
+import net.snowflake.HiveMetastoreConnector.core.commands.Command;
+import net.snowflake.HiveMetastoreConnector.core.util.CommandGenerator;
+import net.snowflake.HiveMetastoreConnector.core.util.Scheduler;
+import net.snowflake.HiveMetastoreConnector.hive.listener.SnowflakeHiveListener;
 import org.apache.hadoop.hive.metastore.events.ListenerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -211,7 +211,8 @@ public class SnowflakeClient
   {
     try
     {
-      Class.forName("com.snowflake.jdbc.client.SnowflakeClient");
+      Class.forName(
+          "net.snowflake.HiveMetastoreConnector.jdbc.client.SnowflakeClient");
     }
     catch(ClassNotFoundException e)
     {

@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2012-2019 Snowflake Computing Inc. All right reserved.
  */
-package com.snowflake.hive.listener;
+package net.snowflake.HiveMetastoreConnector.hive.listener;
 
 import com.google.common.base.Preconditions;
-import com.snowflake.conf.SnowflakeConf;
-import com.snowflake.jdbc.client.SnowflakeClient;
+import net.snowflake.HiveMetastoreConnector.conf.SnowflakeConf;
+import net.snowflake.HiveMetastoreConnector.jdbc.client.SnowflakeClient;
 import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Pattern;

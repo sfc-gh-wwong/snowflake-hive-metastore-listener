@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2012-2019 Snowflake Computing Inc. All right reserved.
  */
-package com.snowflake.core.commands;
+package net.snowflake.HiveMetastoreConnector.core.commands;
 
 import com.google.common.base.Preconditions;
-import com.snowflake.core.util.StringUtil;
+import net.snowflake.HiveMetastoreConnector.core.util.StringUtil;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.events.DropPartitionEvent;
